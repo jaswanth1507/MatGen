@@ -108,7 +108,7 @@ class NLPProcessor:
         outputs = self.model.generate(
             inputs.input_ids,
             max_length=512,
-            temperature=0.1,
+            temperature=0.5,
             top_p=0.9,
             do_sample=True
         )

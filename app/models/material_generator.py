@@ -27,6 +27,7 @@ class MaterialGenerator:
         self.model_dir = model_dir
         self.use_gpu = use_gpu
         self.model_components = None
+        self.max_materials = 1000
         
         # Load the model if the directory exists
         if os.path.exists(model_dir):
