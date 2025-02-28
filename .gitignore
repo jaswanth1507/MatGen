@@ -68,7 +68,7 @@ pnpm-debug.log*
 # Build output directories
 build/
 dist/
-
+generated_materials/
 
 # ==============================
 # OS and Editor Files
@@ -85,3 +85,4 @@ Thumbs.db
 .idea/
 *.sublime-project
 *.sublime-workspace
+repomix-output.txt

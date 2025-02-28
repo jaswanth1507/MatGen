@@ -60,13 +60,19 @@ export function getStructureUrl(path: string | null): string | null {
     return path;
   }
   
-  // If path starts with /api, it's relative to the API base URL
-  if (path.startsWith('/api/')) {
-    return API_BASE_URL + path.substring(4);
+  // Handle the standard path format from the API
+  if (path.startsWith('/api/structures/')) {
+    // The API URL without the trailing /api
+    const baseUrl = API_BASE_URL.endsWith('/api') 
+      ? API_BASE_URL.slice(0, -4) 
+      : API_BASE_URL.replace(/\/api\/?$/, '');
+    
+    return `${baseUrl}${path}`;
   }
   
-  // Otherwise, it's relative to the API base URL
-  return `${API_BASE_URL}${path}`;
+  // For any other relative path, just append to the API structures endpoint
+  const filename = path.split('/').pop();
+  return `${API_BASE_URL}/structures/${filename}`;
 }
 
 /**

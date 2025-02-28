@@ -10,6 +10,9 @@ import logging
 import numpy as np
 from pymatgen.core import Structure
 
+# Import from the matgen module we created
+from app.matgen import MaterialVAE, StructureRecovery
+
 logger = logging.getLogger(__name__)
 
 class MaterialGenerator:
@@ -45,8 +48,6 @@ class MaterialGenerator:
                 vae_config = json.load(f)
             
             # Create the VAE model
-            from matgen import MaterialVAE
-            
             vae = MaterialVAE(
                 input_dim=vae_config['input_dim'],
                 property_dim=vae_config['property_dim'],
@@ -90,8 +91,6 @@ class MaterialGenerator:
                 feature_matrix = np.load(os.path.join(self.model_dir, "feature_matrix.npy"))
                 
                 if filtered_materials is not None:
-                    from matgen import StructureRecovery
-                    
                     recovery = StructureRecovery(feature_matrix, filtered_materials, feature_scaler)
             
             # Store model components

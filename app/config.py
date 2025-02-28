@@ -12,7 +12,7 @@ class Config:
     MAX_CONTENT_LENGTH = 16 * 1024 * 1024  # 16 MB max upload size
     
     # Model settings
-    MODEL_DIR = os.environ.get('MODEL_DIR') or 'models/trained_material_vae'
+    MODEL_DIR = os.environ.get('MODEL_DIR') or 'app/trained_material_vae'
     NLP_MODEL_NAME = os.environ.get('NLP_MODEL_NAME') or 'microsoft/phi-3-mini-4k-instruct'
     USE_GPU = os.environ.get('USE_GPU', 'true').lower() == 'true'
     LOAD_MODELS_AT_STARTUP = os.environ.get('LOAD_MODELS_AT_STARTUP', 'false').lower() == 'true'

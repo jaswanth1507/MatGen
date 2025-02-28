@@ -155,8 +155,49 @@ def generate_materials():
 def get_structure(filename):
     """Get a specific structure file"""
     try:
+        # Get the output folder from config
+        output_folder = current_app.config['OUTPUT_FOLDER']
+        
+        # Get absolute path to ensure proper resolution
+        abs_output_folder = os.path.abspath(output_folder)
+        abs_file_path = os.path.join(abs_output_folder, filename)
+        
+        # Enhanced logging
+        current_app.logger.info(f"Structure file requested: {filename}")
+        current_app.logger.info(f"Config OUTPUT_FOLDER: {output_folder}")
+        current_app.logger.info(f"Absolute output folder: {abs_output_folder}")
+        current_app.logger.info(f"Absolute file path: {abs_file_path}")
+        
+        # Check if the output directory exists
+        if not os.path.exists(abs_output_folder):
+            current_app.logger.error(f"Output directory doesn't exist: {abs_output_folder}")
+            return jsonify({
+                'success': False,
+                'error': f"Output directory doesn't exist"
+            }), 500
+        
+        # List all files in the directory for debugging
+        dir_files = os.listdir(abs_output_folder)
+        current_app.logger.info(f"Files in directory ({len(dir_files)}): {', '.join(dir_files[:10])}{'...' if len(dir_files) > 10 else ''}")
+        
+        # Check if the file exists
+        if not os.path.exists(abs_file_path):
+            current_app.logger.error(f"File not found: {abs_file_path}")
+            
+            # Look for similar filenames to help debug
+            similar_files = [f for f in dir_files if filename.split('_')[0] in f or filename.split('_')[-1] in f]
+            if similar_files:
+                current_app.logger.info(f"Similar files found: {similar_files}")
+            
+            return jsonify({
+                'success': False,
+                'error': f"File not found: {filename}"
+            }), 404
+        
+        # If the file exists, serve it
+        current_app.logger.info(f"File found! Serving: {abs_file_path}")
         return send_from_directory(
-            current_app.config['OUTPUT_FOLDER'], 
+            abs_output_folder, 
             filename, 
             as_attachment=True,
             mimetype='chemical/x-cif'
@@ -165,5 +206,5 @@ def get_structure(filename):
         current_app.logger.exception(f"Error retrieving structure file: {str(e)}")
         return jsonify({
             'success': False,
-            'error': f"File not found: {filename}"
-        }), 404
+            'error': f"Error retrieving file: {filename} - {str(e)}"
+        }), 500

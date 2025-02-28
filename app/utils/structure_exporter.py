@@ -25,6 +25,10 @@ def export_structures(materials, output_dir, formats=["cif"]):
     # Create output directory if it doesn't exist
     os.makedirs(output_dir, exist_ok=True)
     
+    # Get absolute path for clarity
+    abs_output_dir = os.path.abspath(output_dir)
+    logger.info(f"Exporting structures to directory: {abs_output_dir}")
+    
     exported_files = {}
     
     for i, material in enumerate(materials):
@@ -41,39 +45,63 @@ def export_structures(materials, output_dir, formats=["cif"]):
             
             # Export as CIF
             if "cif" in formats:
-                cif_path = os.path.join(output_dir, f"{safe_name}.cif")
-                cif_writer = CifWriter(structure)
-                cif_writer.write_file(cif_path)
-                material_files['cif'] = cif_path
-                logger.info(f"Exported {formula} to CIF: {cif_path}")
+                cif_path = os.path.join(abs_output_dir, f"{safe_name}.cif")
+                try:
+                    cif_writer = CifWriter(structure)
+                    cif_writer.write_file(cif_path)
+                    material_files['cif'] = cif_path
+                    # Verify the file was actually created
+                    if os.path.exists(cif_path):
+                        logger.info(f"Exported {formula} to CIF: {cif_path}")
+                    else:
+                        logger.error(f"Failed to create CIF file at {cif_path}")
+                except Exception as e:
+                    logger.error(f"Error writing CIF for {formula}: {str(e)}")
             
             # Export as XYZ
             if "xyz" in formats:
-                xyz_path = os.path.join(output_dir, f"{safe_name}.xyz")
-                xyz_writer = XYZ(structure)
-                xyz_writer.write_file(xyz_path)
-                material_files['xyz'] = xyz_path
-                logger.info(f"Exported {formula} to XYZ: {xyz_path}")
+                xyz_path = os.path.join(abs_output_dir, f"{safe_name}.xyz")
+                try:
+                    xyz_writer = XYZ(structure)
+                    xyz_writer.write_file(xyz_path)
+                    material_files['xyz'] = xyz_path
+                    # Verify the file was actually created
+                    if os.path.exists(xyz_path):
+                        logger.info(f"Exported {formula} to XYZ: {xyz_path}")
+                    else:
+                        logger.error(f"Failed to create XYZ file at {xyz_path}")
+                except Exception as e:
+                    logger.error(f"Error writing XYZ for {formula}: {str(e)}")
             
             # Save property information in a JSON file
-            props_path = os.path.join(output_dir, f"{safe_name}_properties.json")
-            with open(props_path, 'w') as f:
-                props_data = {
-                    'formula': formula,
-                    'material_id': material_id,
-                    'band_gap': float(material['target_properties'][0]),
-                    'formation_energy': float(material['target_properties'][1]),
-                    'bulk_modulus': float(material['target_properties'][2])
-                }
-                json.dump(props_data, f, indent=2)
-            
-            material_files['properties_json'] = props_path
+            props_path = os.path.join(abs_output_dir, f"{safe_name}_properties.json")
+            try:
+                with open(props_path, 'w') as f:
+                    props_data = {
+                        'formula': formula,
+                        'material_id': material_id,
+                        'band_gap': float(material['target_properties'][0]),
+                        'formation_energy': float(material['target_properties'][1]),
+                        'bulk_modulus': float(material['target_properties'][2])
+                    }
+                    json.dump(props_data, f, indent=2)
+                
+                material_files['properties_json'] = props_path
+            except Exception as e:
+                logger.error(f"Error writing properties JSON for {formula}: {str(e)}")
             
             # Store in results
             exported_files[formula] = material_files
             
         except Exception as e:
             logger.error(f"Error exporting structure for material {i}: {str(e)}")
+    
+    # List files in directory after export for verification
+    try:
+        files_in_dir = os.listdir(abs_output_dir)
+        logger.info(f"Files in output directory after export ({len(files_in_dir)}): {', '.join(files_in_dir[:10])}{'...' if len(files_in_dir) > 10 else ''}")
+    except Exception as e:
+        logger.error(f"Error listing files in output directory: {str(e)}")
     
     return exported_files
 
