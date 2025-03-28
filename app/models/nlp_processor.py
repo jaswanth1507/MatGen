@@ -11,6 +11,50 @@ from transformers import AutoModelForCausalLM, AutoTokenizer
 
 logger = logging.getLogger(__name__)
 
+# Material type to property range mappings
+MATERIAL_TYPE_MAPPINGS = {
+    "metal": {
+        'band_gap': {'min': 0.0, 'max': 0.5},
+        'formation_energy': {'min': -3.0, 'max': 0.0},
+        'bulk_modulus': {'min': 100.0, 'max': 300.0}
+    },
+    "semiconductor": {
+        'band_gap': {'min': 0.5, 'max': 4.0},
+        'formation_energy': {'min': -4.0, 'max': -0.5},
+        'bulk_modulus': {'min': 50.0, 'max': 150.0}
+    },
+    "insulator": {
+        'band_gap': {'min': 4.0, 'max': 10.0},
+        'formation_energy': {'min': -5.0, 'max': -1.0},
+        'bulk_modulus': {'min': 30.0, 'max': 200.0}
+    },
+    "soft_material": {
+        'band_gap': {'min': 0.0, 'max': 8.0},
+        'formation_energy': {'min': -3.0, 'max': -0.1},
+        'bulk_modulus': {'min': 1.0, 'max': 50.0}
+    },
+    "hard_material": {
+        'band_gap': {'min': 0.0, 'max': 8.0},
+        'formation_energy': {'min': -5.0, 'max': -0.5},
+        'bulk_modulus': {'min': 200.0, 'max': 400.0}
+    },
+    "stable_material": {
+        'band_gap': {'min': 0.0, 'max': 8.0},
+        'formation_energy': {'min': -5.0, 'max': -2.0},
+        'bulk_modulus': {'min': 50.0, 'max': 200.0}
+    },
+    "reactive_material": {
+        'band_gap': {'min': 0.0, 'max': 5.0},
+        'formation_energy': {'min': -1.0, 'max': 1.0},
+        'bulk_modulus': {'min': 20.0, 'max': 150.0}
+    },
+    "transparent": {
+        'band_gap': {'min': 3.0, 'max': 10.0},
+        'formation_energy': {'min': -4.0, 'max': -0.5},
+        'bulk_modulus': {'min': 50.0, 'max': 250.0}
+    }
+}
+
 class NLPProcessor:
     def __init__(self, model_name="microsoft/phi-3-mini-4k-instruct", use_gpu=True, load_in_4bit=True, trust_remote_code=True):
         """
@@ -88,6 +132,16 @@ class NLPProcessor:
             ...
         }}
         
+        IMPORTANT: Map common material descriptors to our supported properties:
+        - Insulator/dielectric/non-conductive → high band_gap (>4 eV)
+        - Semiconductor → moderate band_gap (0.5-4 eV)
+        - Conductor/metal → low band_gap (<0.5 eV)
+        - Soft/flexible → low bulk_modulus (<50 GPa)
+        - Hard/rigid/stiff → high bulk_modulus (>200 GPa)
+        - Stable/durable → negative formation_energy (<-1 eV/atom)
+        - Reactive/unstable → higher formation_energy (>-0.5 eV/atom)
+        - Transparent/clear → high band_gap (>3 eV)
+        
         Guidelines:
         1. Only include properties that are explicitly mentioned or strongly implied in the query.
         2. Use realistic value ranges for common material properties:
@@ -108,7 +162,7 @@ class NLPProcessor:
         outputs = self.model.generate(
             inputs.input_ids,
             max_length=512,
-            temperature=0.5,
+            temperature=0.1,
             top_p=0.9,
             do_sample=True
         )
@@ -163,6 +217,39 @@ class NLPProcessor:
         query_lower = query.lower()
         constraints = {}
         
+        # Check for material type keywords first
+        if any(word in query_lower for word in ["metal", "metallic", "conductor", "conductive"]):
+            logger.info("Detected material type: metal")
+            return MATERIAL_TYPE_MAPPINGS["metal"]
+        
+        elif any(word in query_lower for word in ["semiconductor", "semi-conductor", "semi conductor"]):
+            logger.info("Detected material type: semiconductor")
+            return MATERIAL_TYPE_MAPPINGS["semiconductor"]
+        
+        elif any(word in query_lower for word in ["insulator", "dielectric", "non-conductive", "non conductive", "nonconductive"]):
+            logger.info("Detected material type: insulator")
+            return MATERIAL_TYPE_MAPPINGS["insulator"]
+        
+        elif any(word in query_lower for word in ["soft", "flexible", "elastic", "pliable"]):
+            logger.info("Detected material type: soft material")
+            return MATERIAL_TYPE_MAPPINGS["soft_material"]
+        
+        elif any(word in query_lower for word in ["hard", "rigid", "stiff", "strong", "tough"]):
+            logger.info("Detected material type: hard material")
+            return MATERIAL_TYPE_MAPPINGS["hard_material"]
+        
+        elif any(word in query_lower for word in ["stable", "durable", "long-lasting", "long lasting"]):
+            logger.info("Detected material type: stable material")
+            return MATERIAL_TYPE_MAPPINGS["stable_material"]
+        
+        elif any(word in query_lower for word in ["reactive", "unstable", "sensitive"]):
+            logger.info("Detected material type: reactive material")
+            return MATERIAL_TYPE_MAPPINGS["reactive_material"]
+        
+        elif any(word in query_lower for word in ["transparent", "clear", "see-through", "see through"]):
+            logger.info("Detected material type: transparent")
+            return MATERIAL_TYPE_MAPPINGS["transparent"]
+        
         # Extract band gap constraints
         if "band gap" in query_lower or "bandgap" in query_lower:
             min_val, max_val = 0.5, 2.5  # Default values
@@ -192,23 +279,47 @@ class NLPProcessor:
             
             constraints['band_gap'] = {'min': min_val, 'max': max_val}
         
-        # Extract formation energy constraints (similar pattern)
+        # Extract formation energy constraints
         if "formation energy" in query_lower or "formation" in query_lower:
-            # Apply similar extraction patterns for formation energy
             min_val, max_val = -2.0, -0.1  # Default values
             
-            # Implementation similar to band gap pattern matching
-            # ...
+            # Look for ranges
+            range_match = re.search(r'(\-?\d+\.?\d*)\s*(?:to|and|\-)\s*(\-?\d+\.?\d*)\s*(?:eV/atom|eV)', query_lower)
+            if range_match:
+                min_val = float(range_match.group(1))
+                max_val = float(range_match.group(2))
+            
+            # Look for minimum values
+            min_match = re.search(r'(?:at least|greater than|more than|above|>\s*|≥\s*)(\-?\d+\.?\d*)\s*(?:eV/atom|eV)', query_lower)
+            if min_match:
+                min_val = float(min_match.group(1))
+            
+            # Look for maximum values
+            max_match = re.search(r'(?:at most|less than|below|<\s*|≤\s*)(\-?\d+\.?\d*)\s*(?:eV/atom|eV)', query_lower)
+            if max_match:
+                max_val = float(max_match.group(1))
             
             constraints['formation_energy'] = {'min': min_val, 'max': max_val}
         
-        # Extract bulk modulus constraints (similar pattern)
-        if "bulk modulus" in query_lower or "modulus" in query_lower or "stiffness" in query_lower:
-            # Apply similar extraction patterns for bulk modulus
+        # Extract bulk modulus constraints
+        if any(term in query_lower for term in ["bulk modulus", "modulus", "stiffness", "rigidity", "hardness"]):
             min_val, max_val = 50, 200  # Default values
             
-            # Implementation similar to band gap pattern matching
-            # ...
+            # Look for ranges
+            range_match = re.search(r'(\d+\.?\d*)\s*(?:to|and|\-)\s*(\d+\.?\d*)\s*(?:GPa)', query_lower)
+            if range_match:
+                min_val = float(range_match.group(1))
+                max_val = float(range_match.group(2))
+            
+            # Look for minimum values
+            min_match = re.search(r'(?:at least|greater than|more than|above|>\s*|≥\s*)(\d+\.?\d*)\s*(?:GPa)', query_lower)
+            if min_match:
+                min_val = float(min_match.group(1))
+            
+            # Look for maximum values
+            max_match = re.search(r'(?:at most|less than|below|<\s*|≤\s*)(\d+\.?\d*)\s*(?:GPa)', query_lower)
+            if max_match:
+                max_val = float(max_match.group(1))
             
             constraints['bulk_modulus'] = {'min': min_val, 'max': max_val}
         
@@ -224,18 +335,28 @@ class NLPProcessor:
         Returns:
             dict: Constraints formatted for MEGNet+VAE
         """
-        # Default property ranges
+        # Check if any constraints were extracted
+        if not constraints:
+            # If query had no recognizable terms, use wide ranges for diversity
+            logger.info("No specific constraints extracted, using wide property ranges for diversity")
+            return {
+                'band_gap': {'min': 0.0, 'max': 8.0},           # Full range from metals to insulators
+                'formation_energy': {'min': -5.0, 'max': 0.0},   # Wide range of stability
+                'bulk_modulus': {'min': 10.0, 'max': 300.0}     # Wide range from soft to hard
+            }
+        
+        # Default property ranges (more diverse than original)
         megnet_constraints = {
-            'band_gap': constraints.get('band_gap', {'min': 0.5, 'max': 2.5}),
-            'formation_energy': constraints.get('formation_energy', {'min': -2.0, 'max': -0.1}),
-            'bulk_modulus': constraints.get('bulk_modulus', {'min': 50, 'max': 200})
+            'band_gap': constraints.get('band_gap', {'min': 0.0, 'max': 5.0}),
+            'formation_energy': constraints.get('formation_energy', {'min': -3.0, 'max': -0.1}),
+            'bulk_modulus': constraints.get('bulk_modulus', {'min': 30.0, 'max': 250.0})
         }
         
         # Log which properties were found vs. using defaults
         for prop, default_range in [
-            ('band_gap', {'min': 0.5, 'max': 2.5}),
-            ('formation_energy', {'min': -2.0, 'max': -0.1}),
-            ('bulk_modulus', {'min': 50, 'max': 200})
+            ('band_gap', {'min': 0.0, 'max': 5.0}),
+            ('formation_energy', {'min': -3.0, 'max': -0.1}),
+            ('bulk_modulus', {'min': 30.0, 'max': 250.0})
         ]:
             if prop in constraints:
                 logger.info(f"Using extracted constraint for '{prop}': {constraints[prop]}")

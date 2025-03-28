@@ -12,6 +12,7 @@
   let query: string = '';
   let n_samples: number = 5;
   let temperature: number = 1.2;
+  let strictness: number = 0.8;  // Add strictness parameter
   let loading: boolean = false;
   let error: string | null = null;
   
@@ -41,7 +42,8 @@
       const result = await generateMaterials({
         query,
         n_samples,
-        temperature
+        temperature,
+        strictness  // Add strictness parameter
       });
       
       dispatch('success', result);
@@ -89,6 +91,20 @@
       step="0.1"
     />
     <span>{temperature}</span>
+  </div>
+  
+  <!-- Add strictness slider -->
+  <div class="option">
+    <label for="strictness">Constraint Strictness</label>
+    <input 
+      type="range" 
+      id="strictness" 
+      bind:value={strictness} 
+      min="0.2" 
+      max="1.0" 
+      step="0.1"
+    />
+    <span>{strictness}</span>
   </div>
 </div>
 

@@ -195,70 +195,96 @@ class StructureRecovery:
     def recover_structures(self, generated_features, return_multiple=False, diversity_weight=0.7):
         """
         Recover crystal structures from generated features with improved diversity.
-
+    
         Args:
             generated_features (np.ndarray): Generated feature vectors
             return_multiple (bool): Whether to return multiple candidate structures
             diversity_weight (float): Weight for diversity penalty (0-1)
-
+    
         Returns:
             list: Recovered structures or list of candidate structures
         """
         # Inverse transform if scaler is provided
         if self.feature_scaler is not None:
             generated_features = self.feature_scaler.inverse_transform(generated_features)
-
+    
         # Find nearest neighbors
         distances, indices = self.nn_model.kneighbors(generated_features)
-
+    
         recovered_structures = []
         for i in range(len(generated_features)):
             if return_multiple:
                 # Return multiple candidate structures, promoting diversity
                 candidates = []
                 already_added = set()  # Track formulas we've already added
-
+    
                 # First pass: try to find diverse candidates
                 for j in range(min(15, self.n_neighbors)):  # Look at more neighbors
                     idx = indices[i, j]
                     structure = self.materials[idx]["structure"]
                     formula = structure.composition.reduced_formula
                     distance = distances[i, j]
-
+    
                     # Only add if we haven't seen this formula yet in this batch
                     if formula not in already_added:
-                        candidates.append({
+                        # Include actual property data when available
+                        candidate = {
                             "structure": structure,
                             "distance": distance,
-                            "material_id": self.materials[idx]["material_id"]
-                        })
+                            "material_id": self.materials[idx].get("material_id", "")
+                        }
+                        
+                        # Add material properties if available
+                        if "band_gap" in self.materials[idx]:
+                            candidate["band_gap"] = self.materials[idx]["band_gap"]
+                        
+                        if "formation_energy_per_atom" in self.materials[idx]:
+                            candidate["formation_energy_per_atom"] = self.materials[idx]["formation_energy_per_atom"]
+                        
+                        if "bulk_modulus" in self.materials[idx]:
+                            candidate["bulk_modulus"] = self.materials[idx]["bulk_modulus"]
+                        
+                        candidates.append(candidate)
                         already_added.add(formula)
-
+    
                     # If we have enough candidates, stop
                     if len(candidates) >= 5:
                         break
-
+                    
                 # Second pass: if we don't have enough candidates, add more
                 if len(candidates) < 5:
                     for j in range(self.n_neighbors):
                         idx = indices[i, j]
                         structure = self.materials[idx]["structure"]
                         distance = distances[i, j]
-
+    
                         # Check if we already added this material
                         if j < len(candidates):
                             continue
-
-                        candidates.append({
+                        
+                        # Include actual property data
+                        candidate = {
                             "structure": structure,
                             "distance": distance,
-                            "material_id": self.materials[idx]["material_id"]
-                        })
-
+                            "material_id": self.materials[idx].get("material_id", "")
+                        }
+                        
+                        # Add material properties if available
+                        if "band_gap" in self.materials[idx]:
+                            candidate["band_gap"] = self.materials[idx]["band_gap"]
+                        
+                        if "formation_energy_per_atom" in self.materials[idx]:
+                            candidate["formation_energy_per_atom"] = self.materials[idx]["formation_energy_per_atom"]
+                        
+                        if "bulk_modulus" in self.materials[idx]:
+                            candidate["bulk_modulus"] = self.materials[idx]["bulk_modulus"]
+                            
+                        candidates.append(candidate)
+    
                         # Stop when we have 5 candidates
                         if len(candidates) >= 5:
                             break
-
+                        
                 recovered_structures.append(candidates)
             else:
                 # Find the best match that promotes diversity

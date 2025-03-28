@@ -70,9 +70,10 @@ def generate_materials():
         query = data['query']
         n_samples = int(data.get('n_samples', current_app.config['DEFAULT_SAMPLES']))
         temperature = float(data.get('temperature', current_app.config['DEFAULT_TEMPERATURE']))
+        strictness = float(data.get('strictness', 0.8))  # Add strictness parameter
         
         current_app.logger.info(f"Processing query: {query}")
-        current_app.logger.info(f"Parameters: n_samples={n_samples}, temperature={temperature}")
+        current_app.logger.info(f"Parameters: n_samples={n_samples}, temperature={temperature}, strictness={strictness}")
         
         # Start timer
         start_time = time.time()
@@ -95,7 +96,8 @@ def generate_materials():
         materials = generator.generate_materials(
             constraints, 
             n_samples=n_samples, 
-            temperature=temperature
+            temperature=temperature,
+            strictness=strictness  # Pass strictness parameter
         )
         
         if not materials:

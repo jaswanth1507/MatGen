@@ -15,11 +15,13 @@ const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000/api'
 export async function generateMaterials({ 
   query, 
   n_samples = 5, 
-  temperature = 1.2 
+  temperature = 1.2,
+  strictness = 0.8  // Add strictness parameter
 }: { 
   query: string; 
   n_samples?: number; 
-  temperature?: number 
+  temperature?: number;
+  strictness?: number;  // Add strictness parameter
 }): Promise<GenerationResponse> {
   try {
     const response = await fetch(`${API_BASE_URL}/generate`, {
@@ -31,6 +33,7 @@ export async function generateMaterials({
         query,
         n_samples,
         temperature,
+        strictness  // Add strictness parameter
       }),
     });
 
